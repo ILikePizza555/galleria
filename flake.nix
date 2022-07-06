@@ -11,15 +11,15 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        rust-pkg = fenix.packages.${system}.stable.withComponents [ 
+        rust = fenix.packages.${system}.stable.withComponents [ 
           "cargo"
           "rustc"
           "rustfmt"
           "rust-src"
         ];
         commonBuildInputs = [
-          pkg-config
-          rust-pkg
+          pkgs.pkg-config
+          rust
         ];
       in
         {
