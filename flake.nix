@@ -18,6 +18,7 @@
           "rust-src"
         ];
         commonBuildInputs = [
+          pkgs.openssl
           pkgs.pkg-config
           rust
         ];
