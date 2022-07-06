@@ -18,6 +18,7 @@
           "rust-src"
         ];
         commonBuildInputs = [
+          pkg-config
           rust-pkg
         ];
       in
