@@ -1,4 +1,4 @@
-use sea_orm_migration::{prelude::*, sea_orm::tests_cfg::cake::Column};
+use sea_orm_migration::prelude::*;
 
 #[derive(Iden)]
 pub enum Galleries {
