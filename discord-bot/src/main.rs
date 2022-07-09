@@ -1,31 +1,12 @@
+mod bot;
+
+use crate::bot::Handler;
+
 use std::env;
-use std::io::ErrorKind;
-
 use anyhow::Result;
-use sea_orm::{Database, DatabaseConnection};
-use serenity::model::channel::Message;
-use serenity::{ Client, async_trait, model::gateway::Ready};
+use sea_orm::{Database};
+use serenity::Client;
 use serenity::prelude::GatewayIntents;
-use serenity::client::{EventHandler, Context};
-
-struct Handler {
-    db_connection: DatabaseConnection
-}
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "~ping" {
-            if let Err(why) = msg.channel_id.say(&ctx.http, "Pong!").await {
-                println!("Error sending message: {:?}", why);
-            }
-        }
-    }
-
-    async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
-    }
-}
 
 fn load() -> Result<(String, String)> {
     // Load the dotenv file, but ignore not found errors. 
