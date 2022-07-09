@@ -10,6 +10,7 @@ edition = "2021"
 
 [dependencies]
 sql-entities = { path = "./sql-entities" }
+dotenv = "0.15"
 
 [dependencies.serenity]
 version = "0.11.2"
