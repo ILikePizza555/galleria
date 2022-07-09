@@ -17,3 +17,4 @@ features = ["rt", "net", "macros"]
 
 [dependencies.sea-orm-migration]
 version = "^0.8.0"
+features = ["sqlx-postgres", "runtime-tokio-rustls"]
