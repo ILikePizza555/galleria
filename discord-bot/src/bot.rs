@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::Message, gateway::Ready, id::ChannelId}};
 use tracing::{info, warn, error};
 use sql_entities::galleries as gallery;
@@ -39,18 +39,29 @@ impl Handler {
         info!("Starting gallery creation.");
         
         // Check if the channel already exists
-        let gallery = gallery::Entity::find()
-            .filter(gallery::Column::ChannelId.eq(*msg.channel_id.as_u64() as i64))
+        let channel_id = *msg.channel_id.as_u64();
+        let gallery_check = gallery::Entity::find()
+            .filter(gallery::Column::ChannelId.eq(channel_id as i64))
             .one(&self.db_connection)
             .await?;
-        
-        if gallery.is_some() {
-            warn!("Gallery for {} already exists.", msg.channel_id.as_u64());
+
+        if gallery_check.is_some() {
+            warn!("Gallery for {} already exists.", channel_id);
             self.send_message(&ctx, &msg.channel_id, "A gallery for this channel already exists.").await;
             return Ok(())
         }
 
-        
+        info!("Creating new gallery.");
+
+        let channel = msg.channel(&ctx.http).await?;
+        let new_gallery_model = gallery::ActiveModel {
+            name: ActiveValue::Set(channel.to_string()),
+            channel_id: ActiveValue::Set(channel_id as i64),
+            ..Default::default()
+        };
+        let new_gallery = new_gallery_model.insert(&self.db_connection).await?;
+
+        // TODO: Grab all previous messages 
         
         Ok(())
     }
