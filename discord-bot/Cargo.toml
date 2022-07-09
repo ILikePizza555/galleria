@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "sql-entities", "sql-migration"]
+members = [".", "sql-entities", "migration"]
 
 [package]
 name = "discord-bot"
