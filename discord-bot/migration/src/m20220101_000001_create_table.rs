@@ -65,6 +65,7 @@ impl MigrationTrait for Migration {
                         .from_col(GalleryPosts::Gallery)
                         .to_tbl(Galleries::Table)
                         .to_col(Galleries::Pk)
+                        .on_delete(ForeignKeyAction::Cascade)
                 )
                 .to_owned()
         ).await
