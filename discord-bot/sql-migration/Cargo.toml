@@ -11,5 +11,9 @@ path = "src/lib.rs"
 [dependencies]
 sql-entities = { path = "../sql-entities" }
 
+[dependencies.tokio]
+version = "1.19.2"
+features = ["rt", "net", "macros"]
+
 [dependencies.sea-orm-migration]
 version = "^0.8.0"
