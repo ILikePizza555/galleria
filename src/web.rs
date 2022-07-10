@@ -22,11 +22,11 @@ async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> R
     match posts_result {
         Err(why) => {
             error!("Could not load posts from db: {:?}", why);
-            Ok(warp::reply::with_status(warp::reply::html("500 Internal Server Error"), StatusCode::INTERNAL_SERVER_ERROR))
+            Ok(warp::reply::with_status(warp::reply::html("500 Internal Server Error".to_string()), StatusCode::INTERNAL_SERVER_ERROR))
         }
         Ok(posts) => if posts.len() == 0 {
             warn!("Loaded zero posts from gallery id {}", gallery_id);
-            Ok(warp::reply::with_status(warp::reply::html("404 Not Found"), StatusCode::NOT_FOUND))
+            Ok(warp::reply::with_status(warp::reply::html("404 Not Found".to_string()), StatusCode::NOT_FOUND))
         } else {
             debug!("Loaded {} posts from galler {}", posts.len(), gallery_id);
             let markup = html! {
@@ -36,7 +36,7 @@ async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> R
                     }
                 }
             };
-            Ok(warp::reply::html(markup.into_string()))
+            Ok(warp::reply::with_status(warp::reply::html(markup.into_string()), StatusCode::OK))
         }
     }
 }
