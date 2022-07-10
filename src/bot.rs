@@ -10,7 +10,7 @@ pub struct Handler<'db> {
 }
 
 #[async_trait]
-impl EventHandler for Handler {
+impl <'db> EventHandler for Handler<'db> {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "~ping" {
             send_message(&ctx, &msg.channel_id, "Pong!").await;
