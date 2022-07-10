@@ -33,13 +33,6 @@ impl EventHandler for Handler{
 }
 
 impl Handler {
-    async fn get_gallery_by_channel_id(&self, channel_id: u64) -> Result<Option<galleries::Model>> {
-        Ok(galleries::Entity::find()
-            .filter(galleries::Column::DiscordChannelId.eq(channel_id as i64))
-            .one(self.db_connection.as_ref())
-            .await?)
-    }
-
     async fn handle_gallery_command(&self, ctx: &Context, msg: &Message) -> Result<()> {
         let span = span!(Level::TRACE, "create_gallery");
         let _enter = span.enter();
@@ -47,11 +40,8 @@ impl Handler {
         debug!("Starting gallery creation.");
         
         // Check if the channel already exists
-        let channel_id = msg.channel_id.0;
-        let gallery_check = self.get_gallery_by_channel_id(channel_id).await?;
-
-        if gallery_check.is_some() {
-            warn!("Gallery for {} already exists.", channel_id);
+        if self.find_gallery_from_channel_id(msg.channel_id).await?.is_some() {
+            warn!("Gallery for {} already exists.", msg.channel_id.0);
             send_message(&ctx, &msg.channel_id, "A gallery for this channel already exists.").await;
             return Ok(())
         }
@@ -74,7 +64,7 @@ impl Handler {
             return Ok(())
         }
 
-        let gallery = self.get_gallery_by_channel_id(msg.channel_id.0).await?;
+        let gallery = self.find_gallery_from_channel_id(msg.channel_id).await?;
         match gallery {
             Some(gallery_model) => {
                 info!("Creating new gallery entries for message_id {}", msg.id.0);
@@ -96,6 +86,13 @@ impl Handler {
                 Ok(())
             }
         }
+    }
+
+    async fn find_gallery_from_channel_id(&self, channel_id: ChannelId) -> Result<Option<galleries::Model>, DbErr> {
+        galleries::Entity::find()
+            .filter(galleries::Column::DiscordChannelId.eq(channel_id.0 as i64))
+            .one(self.db_connection.as_ref())
+            .await
     }
 
     async fn create_gallery(&self, channel: Channel) -> Result<galleries::Model, DbErr> {
