@@ -9,7 +9,7 @@ use tracing::{debug, warn, error};
 
 pub fn galleria_service(db: Arc<DatabaseConnection>) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::path!("gallery" / i32)
-        .and(warp::any().map(move || db))
+        .and(warp::any().map(move || db.clone()))
         .and_then(render_gallery_posts)
 }
 
