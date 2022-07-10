@@ -5,7 +5,8 @@ pub enum Galleries {
     Table,
     Pk,
     Name,
-    ChannelId
+    ChannelId,
+    DateCreated,
 }
 
 #[derive(Iden)]
@@ -14,7 +15,8 @@ pub enum GalleryPosts {
     Pk,
     Gallery,
     DiscordMessageId,
-    Link
+    Link,
+    DateCreated,
 }
 
 pub struct Migration;
@@ -41,6 +43,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Galleries::Name).text().not_null())
                     .col(ColumnDef::new(Galleries::ChannelId).big_unsigned().not_null())
+                    .col(ColumnDef::new(Galleries::DateCreated).timestamp().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
                     .to_owned()
             )
             .await?;
@@ -58,6 +61,7 @@ impl MigrationTrait for Migration {
                 .col(ColumnDef::new(GalleryPosts::Gallery).integer().not_null())
                 .col(ColumnDef::new(GalleryPosts::DiscordMessageId).big_unsigned().not_null())
                 .col(ColumnDef::new(GalleryPosts::Link).text().not_null())
+                .col(ColumnDef::new(GalleryPosts::DateCreated).timestamp().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
                 .foreign_key(
                     ForeignKeyCreateStatement::new()
                         .name("fk_gallery_posts")

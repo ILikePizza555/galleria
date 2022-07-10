@@ -11,6 +11,7 @@ pub struct Model {
     pub discord_message_id: i64,
     #[sea_orm(column_type = "Text")]
     pub link: String,
+    pub date_created: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

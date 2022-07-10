@@ -10,6 +10,7 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub name: String,
     pub channel_id: i64,
+    pub date_created: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
