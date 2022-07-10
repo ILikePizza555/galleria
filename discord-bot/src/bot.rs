@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::Message, gateway::Ready, id::ChannelId}};
-use tracing::{info, warn, error, span, Level};
+use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::galleries as gallery;
 use sql_entities::gallery_posts as gallery_post;
 
@@ -43,7 +43,7 @@ impl Handler {
         let span = span!(Level::TRACE, "create_gallery");
         let _enter = span.enter();
 
-        info!("Starting gallery creation.");
+        debug!("Starting gallery creation.");
         
         // Check if the channel already exists
         let channel_id = msg.channel_id.0;
@@ -78,7 +78,7 @@ impl Handler {
 
         let images: Vec<String> = filter_images(&msg).collect();
         if images.len() == 0 {
-            info!("Message {} has no image attachements or embeds", msg.id.0);
+            debug!("Message {} has no image attachements or embeds", msg.id.0);
             return Ok(())
         }
 
@@ -100,7 +100,7 @@ impl Handler {
                 Ok(())
             },
             None => {
-                info!("No gallery found with associated channel_id {}", msg.channel_id.0);
+                debug!("No gallery found with associated channel_id {}", msg.channel_id.0);
                 Ok(())
             }
         }
