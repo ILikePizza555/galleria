@@ -4,15 +4,14 @@ use anyhow::Result;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::Message, gateway::Ready, id::ChannelId}};
 use tracing::{info, debug, warn, error, span, Level};
-use sql_entities::galleries as gallery;
-use sql_entities::gallery_posts as gallery_post;
+use sql_entities::{galleries, gallery_posts};
 
 pub struct Handler {
     pub db_connection: Arc<DatabaseConnection>
 }
 
 #[async_trait]
-impl EventHandler for Handler{
+impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "~ping" {
             send_message(&ctx, &msg.channel_id, "Pong!").await;
@@ -34,13 +33,6 @@ impl EventHandler for Handler{
 }
 
 impl Handler {
-    async fn get_gallery_by_channel_id(&self, channel_id: u64) -> Result<Option<gallery::Model>> {
-        Ok(gallery::Entity::find()
-            .filter(gallery::Column::ChannelId.eq(channel_id as i64))
-            .one(self.db_connection.as_ref())
-            .await?)
-    }
-
     async fn create_gallery(&self, ctx: &Context, msg: &Message) -> Result<()> {
         let span = span!(Level::TRACE, "create_gallery");
         let _enter = span.enter();
@@ -49,7 +41,8 @@ impl Handler {
         
         // Check if the channel already exists
         let channel_id = msg.channel_id.0;
-        let gallery_check = self.get_gallery_by_channel_id(channel_id).await?;
+        let gallery_check = galleries::Entity::
+            find_by_channel_id(self.db_connection.as_ref(), channel_id).await?;
 
         if gallery_check.is_some() {
             warn!("Gallery for {} already exists.", channel_id);
@@ -60,9 +53,9 @@ impl Handler {
         info!("Creating new gallery.");
 
         let channel = msg.channel(&ctx.http).await?;
-        let new_gallery_model = gallery::ActiveModel {
+        let new_gallery_model = galleries::ActiveModel {
             name: ActiveValue::Set(channel.to_string()),
-            channel_id: ActiveValue::Set(channel_id as i64),
+            discord_channel_id: ActiveValue::Set(channel_id as i64),
             ..Default::default()
         };
         let _new_gallery = new_gallery_model.insert(self.db_connection.as_ref()).await?;
@@ -78,25 +71,29 @@ impl Handler {
         let span = span!(Level::TRACE, "handle_new_message");
         let _enter = span.enter();
 
+        debug!("handle_new_message {:?}", msg);
+
         let images: Vec<String> = filter_images(&msg).collect();
         if images.len() == 0 {
             debug!("Message {} has no image attachements or embeds", msg.id.0);
             return Ok(())
         }
 
-        let gallery = self.get_gallery_by_channel_id(msg.channel_id.0).await?;
+        let gallery = galleries::Entity::
+            find_by_channel_id(self.db_connection.as_ref(), msg.channel_id.0).await?;
+        
         match gallery {
             Some(gallery_model) => {
                 info!("Creating new gallery entries for message_id {}", msg.id.0);
 
                 let new_gallery_posts = images.iter()
-                    .map(|url| gallery_post::ActiveModel {
+                    .map(|url| gallery_posts::ActiveModel {
                         gallery: ActiveValue::Set(gallery_model.pk),
                         discord_message_id: ActiveValue::Set(msg.id.0 as i64),
                         link: ActiveValue::Set(url.to_string()),
                         ..Default::default()
                     });
-                gallery_post::Entity::insert_many(new_gallery_posts).exec(self.db_connection.as_ref()).await?;
+                gallery_posts::Entity::insert_many(new_gallery_posts).exec(self.db_connection.as_ref()).await?;
 
                 info!("Successfully created {} gallery entries.", images.len());
                 Ok(())
