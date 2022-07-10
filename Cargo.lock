@@ -709,6 +709,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dotenv",
+ "futures",
  "maud",
  "sea-orm",
  "serenity",
