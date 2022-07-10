@@ -9,7 +9,7 @@ pub struct Model {
     pub pk: i32,
     #[sea_orm(column_type = "Text")]
     pub name: String,
-    pub channel_id: i64,
+    pub discord_channel_id: i64,
     pub date_created: DateTimeUtc,
 }
 
