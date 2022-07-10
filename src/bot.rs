@@ -11,7 +11,7 @@ pub struct Handler {
 }
 
 #[async_trait]
-impl EventHandler for Handler {
+impl EventHandler for Handler{
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "~ping" {
             send_message(&ctx, &msg.channel_id, "Pong!").await;
@@ -33,6 +33,13 @@ impl EventHandler for Handler {
 }
 
 impl Handler {
+    async fn get_gallery_by_channel_id(&self, channel_id: u64) -> Result<Option<galleries::Model>> {
+        Ok(galleries::Entity::find()
+            .filter(galleries::Column::DiscordChannelId.eq(channel_id as i64))
+            .one(self.db_connection.as_ref())
+            .await?)
+    }
+
     async fn handle_gallery_command(&self, ctx: &Context, msg: &Message) -> Result<()> {
         let span = span!(Level::TRACE, "create_gallery");
         let _enter = span.enter();
@@ -41,8 +48,7 @@ impl Handler {
         
         // Check if the channel already exists
         let channel_id = msg.channel_id.0;
-        let gallery_check = galleries::Entity::
-            find_by_channel_id(self.db_connection.as_ref(), channel_id).await?;
+        let gallery_check = self.get_gallery_by_channel_id(channel_id).await?;
 
         if gallery_check.is_some() {
             warn!("Gallery for {} already exists.", channel_id);
@@ -62,17 +68,13 @@ impl Handler {
         let span = span!(Level::TRACE, "handle_new_message");
         let _enter = span.enter();
 
-        debug!("handle_new_message {:?}", msg);
-
         let images: Vec<String> = filter_images(&msg).collect();
         if images.len() == 0 {
             debug!("Message {} has no image attachements or embeds", msg.id.0);
             return Ok(())
         }
 
-        let gallery = galleries::Entity::
-            find_by_channel_id(self.db_connection.as_ref(), msg.channel_id.0).await?;
-        
+        let gallery = self.get_gallery_by_channel_id(msg.channel_id.0).await?;
         match gallery {
             Some(gallery_model) => {
                 info!("Creating new gallery entries for message_id {}", msg.id.0);
