@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait};
-use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::Message, gateway::Ready, id::ChannelId}};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr};
+use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel}, gateway::Ready, id::ChannelId}};
 use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::{galleries, gallery_posts};
 
@@ -16,7 +16,7 @@ impl EventHandler for Handler {
         if msg.content == "~ping" {
             send_message(&ctx, &msg.channel_id, "Pong!").await;
         } else if msg.content == "~gallery" {
-            if let Err(why) = self.create_gallery(&ctx, &msg).await {
+            if let Err(why) = self.handle_gallery_command(&ctx, &msg).await {
                 error!("Error executing gallery command: {:?}", why);
                 send_message(&ctx, &msg.channel_id, "An error occured while running the command.").await;
             }
@@ -33,7 +33,7 @@ impl EventHandler for Handler {
 }
 
 impl Handler {
-    async fn create_gallery(&self, ctx: &Context, msg: &Message) -> Result<()> {
+    async fn handle_gallery_command(&self, ctx: &Context, msg: &Message) -> Result<()> {
         let span = span!(Level::TRACE, "create_gallery");
         let _enter = span.enter();
 
@@ -50,17 +50,8 @@ impl Handler {
             return Ok(())
         }
 
-        info!("Creating new gallery.");
-
-        let channel = msg.channel(&ctx.http).await?;
-        let new_gallery_model = galleries::ActiveModel {
-            name: ActiveValue::Set(channel.to_string()),
-            discord_channel_id: ActiveValue::Set(channel_id as i64),
-            ..Default::default()
-        };
-        let _new_gallery = new_gallery_model.insert(self.db_connection.as_ref()).await?;
-
-        info!("Successfully created a new gallery.");
+        let new_gallery = self.create_gallery(msg.channel(&ctx.http).await?).await?;
+        info!("Successfully created a new gallery: {}.", new_gallery.pk);
 
         // TODO: Grab all previous messages 
         
@@ -103,6 +94,16 @@ impl Handler {
                 Ok(())
             }
         }
+    }
+
+    async fn create_gallery(&self, channel: Channel) -> Result<galleries::Model, DbErr> {
+        let gallery_active_model = galleries::ActiveModel {
+            name: ActiveValue::Set(channel.to_string()),
+            discord_channel_id: ActiveValue::Set(channel.id().0 as i64),
+            ..Default::default()
+        };
+
+        gallery_active_model.insert(self.db_connection.as_ref()).await
     }
 }
 
