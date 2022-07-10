@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, Context as ErrorContext};
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr};
-use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel}, gateway::Ready, id::ChannelId}};
+use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel, Attachment, Embed}, gateway::Ready, id::ChannelId, event::MessageUpdateEvent}};
 use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::{galleries, gallery_posts};
 
@@ -64,8 +64,8 @@ impl Handler {
         let span = span!(Level::TRACE, "handle_new_message");
         let _enter = span.enter();
 
-        let images: Vec<String> = filter_images(&msg).collect();
-        if images.len() == 0 {
+        let image_urls: Vec<String> = filter_image_urls_from_message(&msg).collect();
+        if image_urls.len() == 0 {
             debug!("Message {} has no image attachements or embeds", msg.id.0);
             return Ok(())
         }
@@ -75,7 +75,7 @@ impl Handler {
             Some(gallery_model) => {
                 info!("Creating new gallery entries for message_id {}", msg.id.0);
 
-                let new_gallery_posts = images.iter()
+                let new_gallery_posts = image_urls.iter()
                     .map(|url| gallery_posts::ActiveModel {
                         gallery: ActiveValue::Set(gallery_model.pk),
                         discord_message_id: ActiveValue::Set(msg.id.0 as i64),
@@ -84,7 +84,7 @@ impl Handler {
                     });
                 gallery_posts::Entity::insert_many(new_gallery_posts).exec(self.db_connection.as_ref()).await?;
 
-                info!("Successfully created {} gallery entries.", images.len());
+                info!("Successfully created {} gallery entries.", image_urls.len());
                 Ok(())
             },
             None => {
@@ -94,7 +94,7 @@ impl Handler {
         }
     }
 
-    async fn handle_message_update(&self, ctx: &Context, event: &MessageUpdateEvent) -> Result<()> {
+    async fn handle_message_update(&self, _ctx: &Context, event: &MessageUpdateEvent) -> Result<()> {
         let gallery = self.find_gallery_from_channel_id(event.channel_id)
             .await
             .context("Failed to query database for galleries with channel id.")?;
@@ -127,13 +127,28 @@ async fn send_message(ctx: &Context, channel_id: &ChannelId, message: impl std::
     }
 }
 
+fn filter_image_urls_from_message(message: &Message) -> impl Iterator<Item = String> + '_ {
+    filter_image_urls(message.attachments.iter(), message.embeds.iter())
+}
+
 /// Filters images from the embeds or attachements from a message
-fn filter_images(msg: &Message) -> impl Iterator<Item = String> + '_ {
-    let attachments_iter = msg.attachments.iter()
-        .filter(|&a| a.content_type.as_ref().unwrap_or(&String::new()).starts_with("image"))
-        .map(|a| a.url.clone());
+fn filter_image_urls<'l, A, E>(a: A, e: E) -> impl Iterator<Item = String> + 'l
+where
+    A: Iterator<Item = &'l Attachment> + 'l,
+    E: Iterator<Item = &'l Embed> + 'l
+{
+    let attachments_iter = a
+        .filter_map(
+            |a| a.content_type.as_ref().and_then(
+                |content_type| if content_type.starts_with("image") {
+                    Some(a.url.clone())
+                } else {
+                    None
+                }
+            )
+        );
     
-    let embeds_iter = msg.embeds.iter()
+    let embeds_iter = e
         .filter_map(|e| e.image.as_ref().map(
             |i| i.url.clone()
         ));
