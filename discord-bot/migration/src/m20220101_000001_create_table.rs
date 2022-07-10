@@ -43,7 +43,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Galleries::Name).text().not_null())
                     .col(ColumnDef::new(Galleries::ChannelId).big_unsigned().not_null())
-                    .col(ColumnDef::new(Galleries::DateCreated).timestamp().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
+                    .col(ColumnDef::new(Galleries::DateCreated).timestamp_with_time_zone().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
                     .to_owned()
             )
             .await?;
@@ -61,7 +61,7 @@ impl MigrationTrait for Migration {
                 .col(ColumnDef::new(GalleryPosts::Gallery).integer().not_null())
                 .col(ColumnDef::new(GalleryPosts::DiscordMessageId).big_unsigned().not_null())
                 .col(ColumnDef::new(GalleryPosts::Link).text().not_null())
-                .col(ColumnDef::new(GalleryPosts::DateCreated).timestamp().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
+                .col(ColumnDef::new(GalleryPosts::DateCreated).timestamp_with_time_zone().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
                 .foreign_key(
                     ForeignKeyCreateStatement::new()
                         .name("fk_gallery_posts")
