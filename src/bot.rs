@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Result, Context as ErrorContext};
-use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr, InsertResult};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel, Attachment, Embed}, gateway::Ready, id::ChannelId, event::MessageUpdateEvent}};
 use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::{galleries, gallery_posts};
@@ -73,18 +73,7 @@ impl Handler {
         let gallery = self.find_gallery_from_channel_id(msg.channel_id).await?;
         match gallery {
             Some(gallery_model) => {
-                info!("Creating new gallery entries for message_id {}", msg.id.0);
-
-                let new_gallery_posts = image_urls.iter()
-                    .map(|url| gallery_posts::ActiveModel {
-                        gallery: ActiveValue::Set(gallery_model.pk),
-                        discord_message_id: ActiveValue::Set(msg.id.0 as i64),
-                        link: ActiveValue::Set(url.to_string()),
-                        ..Default::default()
-                    });
-                gallery_posts::Entity::insert_many(new_gallery_posts).exec(self.db_connection.as_ref()).await?;
-
-                info!("Successfully created {} gallery entries.", image_urls.len());
+                self.create_gallery_posts(&gallery_model, msg.id.0, image_urls).await?;
                 Ok(())
             },
             None => {
@@ -95,11 +84,32 @@ impl Handler {
     }
 
     async fn handle_message_update(&self, _ctx: &Context, event: &MessageUpdateEvent) -> Result<()> {
+        let span = span!(Level::TRACE, "handle_message_update");
+        let _enter = span.enter();
+
+        let image_urls: Vec<String> = filter_image_urls(
+            event.attachments.as_ref().unwrap_or(&Vec::new()).iter(),
+            event.embeds.as_ref().unwrap_or(&Vec::new()).iter()
+        ).collect();
+
+        if image_urls.len() == 0 {
+            return Ok(())
+        }
+        
         let gallery = self.find_gallery_from_channel_id(event.channel_id)
             .await
             .context("Failed to query database for galleries with channel id.")?;
-        
-        Ok(())
+
+        match gallery {
+            Some(gallery_model) => {
+                self.create_gallery_posts(&gallery_model, event.id.0, image_urls).await?;
+                Ok(())
+            }
+            None => {
+                debug!("No gallery found with associated channel_id {}", event.channel_id.0);
+                Ok(())
+            }
+        }
     }
 
     async fn find_gallery_from_channel_id(&self, channel_id: ChannelId) -> Result<Option<galleries::Model>, DbErr> {
@@ -117,6 +127,21 @@ impl Handler {
         };
 
         gallery_active_model.insert(self.db_connection.as_ref()).await
+    }
+
+    async fn create_gallery_posts(&self, gallery: &galleries::Model, message_id: u64, image_urls: Vec<String>) -> Result<InsertResult<gallery_posts::ActiveModel>> {
+        let new_gallery_posts = image_urls.iter()
+            .map(|url| gallery_posts::ActiveModel {
+                gallery: ActiveValue::Set(gallery.pk),
+                discord_message_id: ActiveValue::Set(message_id as i64),
+                link: ActiveValue::Set(url.to_string()),
+                ..Default::default()
+            });
+        
+        gallery_posts::Entity::insert_many(new_gallery_posts)
+            .exec(self.db_connection.as_ref())
+            .await
+            .context("Gallery_post insert_many query failed.")
     }
 }
 
