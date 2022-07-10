@@ -9,7 +9,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use futures::FutureExt;
 use futures::future::try_join;
-use sea_orm::{Database, DatabaseConnection};
+use sea_orm::Database;
 use serenity::Client;
 use serenity::prelude::GatewayIntents;
 
