@@ -49,11 +49,11 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     let mut discord_client = Client::builder(&token, intents)
-        .event_handler(Handler { db_connection })
+        .event_handler(Handler { db_connection: db_connection.clone() })
         .await
         .expect("Error created client");
     
-    let web_server = warp::serve(galleria_service(db_connection)).bind(([127, 0, 0, 1], 3030))
+    let web_server = warp::serve(galleria_service(db_connection.clone())).bind(([127, 0, 0, 1], 3030))
         .map(|_| Ok(()));
 
     if let Err(why) = try_join(discord_client.start(), web_server).await {
