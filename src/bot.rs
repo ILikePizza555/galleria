@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::Message, gateway::Ready, id::ChannelId}};
@@ -5,12 +7,12 @@ use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::galleries as gallery;
 use sql_entities::gallery_posts as gallery_post;
 
-pub struct Handler<'db> {
-    pub db_connection: &'db DatabaseConnection
+pub struct Handler {
+    pub db_connection: Arc<DatabaseConnection>
 }
 
 #[async_trait]
-impl <'db> EventHandler for Handler<'db> {
+impl EventHandler for Handler{
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.content == "~ping" {
             send_message(&ctx, &msg.channel_id, "Pong!").await;
@@ -35,7 +37,7 @@ impl Handler {
     async fn get_gallery_by_channel_id(&self, channel_id: u64) -> Result<Option<gallery::Model>> {
         Ok(gallery::Entity::find()
             .filter(gallery::Column::ChannelId.eq(channel_id as i64))
-            .one(&self.db_connection)
+            .one(self.db_connection.as_ref())
             .await?)
     }
 
@@ -63,7 +65,7 @@ impl Handler {
             channel_id: ActiveValue::Set(channel_id as i64),
             ..Default::default()
         };
-        let _new_gallery = new_gallery_model.insert(&self.db_connection).await?;
+        let _new_gallery = new_gallery_model.insert(self.db_connection.as_ref()).await?;
 
         info!("Successfully created a new gallery.");
 
@@ -94,7 +96,7 @@ impl Handler {
                         link: ActiveValue::Set(url.to_string()),
                         ..Default::default()
                     });
-                gallery_post::Entity::insert_many(new_gallery_posts).exec(&self.db_connection).await?;
+                gallery_post::Entity::insert_many(new_gallery_posts).exec(self.db_connection.as_ref()).await?;
 
                 info!("Successfully created {} gallery entries.", images.len());
                 Ok(())
