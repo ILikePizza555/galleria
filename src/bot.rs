@@ -5,8 +5,8 @@ use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::galleries as gallery;
 use sql_entities::gallery_posts as gallery_post;
 
-pub struct Handler {
-    pub db_connection: DatabaseConnection
+pub struct Handler<'db> {
+    pub db_connection: &'db DatabaseConnection
 }
 
 #[async_trait]

@@ -42,7 +42,7 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { db_connection })
+        .event_handler(Handler { db_connection: &db_connection })
         .await
         .expect("Error created client");
     
