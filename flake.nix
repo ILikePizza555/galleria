@@ -20,7 +20,6 @@
         commonBuildInputs = [
           pkgs.openssl
           pkgs.pkg-config
-          pkgs.deno
           rust
         ];
       in

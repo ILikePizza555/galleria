@@ -2,7 +2,7 @@
 members = [".", "sql-entities", "migration"]
 
 [package]
-name = "discord-bot"
+name = "galleria"
 version = "0.1.0"
 edition = "2021"
 
