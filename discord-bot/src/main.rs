@@ -32,6 +32,8 @@ fn load() -> Result<(String, String)> {
 async fn main() {
     let (token, db_url) = load().unwrap();
 
+    tracing_subscriber::fmt::init();
+
     let db_connection = Database::connect(db_url).await
         .expect("Could not estable a connection to the database.");
 

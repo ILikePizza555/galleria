@@ -509,6 +509,7 @@ dependencies = [
  "sql-entities",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
