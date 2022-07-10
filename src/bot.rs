@@ -27,6 +27,12 @@ impl EventHandler for Handler{
         }
     }
 
+    async fn message_update(&self, ctx: Context, event: MessageUpdateEvent) {
+        if let Err(why) = self.handle_message_update(&ctx, &event).await {
+            error!("Error handling message update: {:?}", why);
+        }
+    }
+
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
@@ -86,6 +92,14 @@ impl Handler {
                 Ok(())
             }
         }
+    }
+
+    async fn handle_message_update(&self, ctx: &Context, event: &MessageUpdateEvent) -> Result<()> {
+        let gallery = self.find_gallery_from_channel_id(event.channel_id)
+            .await
+            .context("Failed to query database for galleries with channel id.")?;
+        
+        Ok(())
     }
 
     async fn find_gallery_from_channel_id(&self, channel_id: ChannelId) -> Result<Option<galleries::Model>, DbErr> {
