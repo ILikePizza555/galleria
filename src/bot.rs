@@ -63,6 +63,7 @@ impl Handler {
     async fn handle_new_message(&self, _ctx: &Context, msg: &Message) -> Result<()> {
         let span = span!(Level::TRACE, "handle_new_message");
         let _enter = span.enter();
+        debug!("handle_new message() - Message: {:?}", msg);
 
         let image_urls: Vec<String> = filter_image_urls_from_message(&msg).collect();
         if image_urls.len() == 0 {
@@ -86,6 +87,7 @@ impl Handler {
     async fn handle_message_update(&self, _ctx: &Context, event: &MessageUpdateEvent) -> Result<()> {
         let span = span!(Level::TRACE, "handle_message_update");
         let _enter = span.enter();
+        debug!("handle_message_update() - MessageUpdateEvent: {:?}", event);
 
         let image_urls: Vec<String> = filter_image_urls(
             event.attachments.as_ref().unwrap_or(&Vec::new()).iter(),
@@ -93,6 +95,7 @@ impl Handler {
         ).collect();
 
         if image_urls.len() == 0 {
+            debug!("Message update has no new image attachments or embeds");
             return Ok(())
         }
         
