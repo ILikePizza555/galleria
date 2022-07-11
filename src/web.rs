@@ -11,6 +11,9 @@ pub fn galleria_service(db: Arc<DatabaseConnection>) -> impl Filter<Extract = im
     warp::path!("gallery" / i32)
         .and(warp::any().map(move || db.clone()))
         .and_then(render_gallery_posts)
+        .or(
+            warp::path("static").and(warp::fs::dir("static"))
+        )
 }
 
 async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> Result<impl warp::Reply, Infallible> {
@@ -30,9 +33,15 @@ async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> R
         } else {
             debug!("Loaded {} posts from galler {}", posts.len(), gallery_id);
             let markup = html! {
-                ul {
-                    @for post in posts {
-                        li { img src = (post.link); }
+                head {
+                    meta name="viewport" content="initial-scale=1";
+                    link rel="stylesheet" href="galleria.css";
+                }
+                body {
+                    #gallery role = "list" {
+                        @for post in posts {
+                            .gallery-item role = "listitem" { img src = (post.link); }
+                        }
                     }
                 }
             };
