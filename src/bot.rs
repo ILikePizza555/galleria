@@ -177,9 +177,11 @@ where
         );
     
     let embeds_iter = e
-        .filter_map(|e| e.image.as_ref().map(
-            |i| i.url.clone()
-        ));
+        .filter_map(|e| {
+            e.image.as_ref()
+                .map(|i| i.url.clone())
+                .or_else(|| e.thumbnail.as_ref().map(|t| t.url.clone()))
+        });
     
     attachments_iter.chain(embeds_iter)
 }
