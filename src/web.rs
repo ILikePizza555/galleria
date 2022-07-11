@@ -33,14 +33,17 @@ async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> R
         } else {
             debug!("Loaded {} posts from galler {}", posts.len(), gallery_id);
             let markup = html! {
-                head {
-                    meta name="viewport" content="initial-scale=1";
-                    link rel="stylesheet" href="galleria.css";
-                }
-                body {
-                    #gallery role = "list" {
-                        @for post in posts {
-                            .gallery-item role = "listitem" { img src = (post.link); }
+                (maud::DOCTYPE)
+                html {
+                    head {
+                        meta name="viewport" content="initial-scale=1";
+                        link rel="stylesheet" href="/static/galleria.css";
+                    }
+                    body {
+                        #gallery role = "list" {
+                            @for post in posts {
+                                .gallery-item role = "listitem" { img src = (post.link); }
+                            }
                         }
                     }
                 }
