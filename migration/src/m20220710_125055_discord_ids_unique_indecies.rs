@@ -26,7 +26,6 @@ impl MigrationTrait for Migration {
             .name("idx_unique_discord_message_id")
             .table(gallery_posts::Entity)
             .col(gallery_posts::Column::DiscordMessageId)
-            .unique()
             .to_owned()
         ).await
     }
