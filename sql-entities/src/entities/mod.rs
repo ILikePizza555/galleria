@@ -2,6 +2,6 @@
 
 pub mod prelude;
 
-pub mod galleries;
-pub mod gallery_posts;
+pub mod gallery;
+pub mod gallery_post;
 pub mod seaql_migrations;
