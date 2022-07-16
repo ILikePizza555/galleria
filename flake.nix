@@ -2,7 +2,7 @@
   description = "A discord bot that turns your image channels into image galleries";
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-21.05;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-22.05;
     fenix.url = github:nix-community/fenix;
     flake-utils.url = "github:numtide/flake-utils";
   };
@@ -32,7 +32,7 @@
           };
 
           devShell = pkgs.mkShell {
-            packages = [pkgs.postgresql] ++ commonBuildInputs;
+            packages = [pkgs.postgresql_14] ++ commonBuildInputs;
           };
         }
     );
