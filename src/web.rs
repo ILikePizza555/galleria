@@ -42,7 +42,7 @@ async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> R
                     body {
                         #gallery role = "list" {
                             @for post in posts {
-                                img.gallery-item role = "listitem" src = (post.link) loading="lazy";
+                                img.gallery-item rel="noreferrer" role = "listitem" src = (post.link) loading="lazy";
                             }
                         }
                     }
