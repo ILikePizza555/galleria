@@ -1,23 +1,4 @@
-use sea_orm_migration::prelude::*;
-
-#[derive(Iden)]
-pub enum Galleries {
-    Table,
-    Pk,
-    Name,
-    ChannelId,
-    DateCreated,
-}
-
-#[derive(Iden)]
-pub enum GalleryPosts {
-    Table,
-    Pk,
-    Gallery,
-    DiscordMessageId,
-    Link,
-    DateCreated,
-}
+use sea_orm_migration::{prelude::*, sea_orm::{ConnectionTrait, Statement}};
 
 pub struct Migration;
 
@@ -30,54 +11,42 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .create_table(
-                Table::create()
-                    .table(Galleries::Table)
-                    .col(
-                        ColumnDef::new(Galleries::Pk)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key()
-                    )
-                    .col(ColumnDef::new(Galleries::Name).text().not_null())
-                    .col(ColumnDef::new(Galleries::ChannelId).big_unsigned().not_null())
-                    .col(ColumnDef::new(Galleries::DateCreated).timestamp_with_time_zone().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
-                    .to_owned()
-            )
-            .await?;
-        
-        manager.create_table(
-            Table::create()
-                .table(GalleryPosts::Table)
-                .col(
-                    ColumnDef::new(GalleryPosts::Pk)
-                        .integer()
-                        .not_null()
-                        .auto_increment()
-                        .primary_key()
-                )
-                .col(ColumnDef::new(GalleryPosts::Gallery).integer().not_null())
-                .col(ColumnDef::new(GalleryPosts::DiscordMessageId).big_unsigned().not_null())
-                .col(ColumnDef::new(GalleryPosts::Link).text().not_null())
-                .col(ColumnDef::new(GalleryPosts::DateCreated).timestamp_with_time_zone().not_null().extra("DEFAULT CURRENT_TIMESTAMP".to_string()))
-                .foreign_key(
-                    ForeignKeyCreateStatement::new()
-                        .name("fk_gallery_posts")
-                        .from_tbl(GalleryPosts::Table)
-                        .from_col(GalleryPosts::Gallery)
-                        .to_tbl(Galleries::Table)
-                        .to_col(Galleries::Pk)
-                        .on_delete(ForeignKeyAction::Cascade)
-                )
-                .to_owned()
-        ).await
+        let sql = r#"
+            CREATE TABLE `gallery` (
+                `pk` UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+                `name` TEXT NOT NULL,
+                `discord_channel_id` BIGINT NOT NULL,
+                `date_created` TIMESTAMPZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE `gallery_post` (
+                `pk` UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+                `gallery` UUID NOT NULL,
+                `discord_message_id` BIGINT NOT NULL,
+                `source_url` TEXT,
+                `media_url` TEXT,
+                `media_width` INTEGER,
+                `media_height` INTEGER,
+                `thumbnail_url` TEXT,
+                `thumbnail_width` INTEGER,
+                `thumbnail_height` INTEGER,
+                `date_created` TIMESTAMPZ NOT NULL DEFAULT CURRENT TIMESTAMP,
+                CONSTRAINT fk_gallery FOREIGN_KEY(gallery) REFERENCES gallery(pk)
+                    ON DELETE CASCADE
+                    ON UPDATE CASCADE,
+            );
+
+            CREATE INDEX idx_gallery_discord_channel_id ON `gallery`(`discord_channel_id`);
+
+            CREATE INDEX idk_gallery_post_discord_message_id ON `gallery_post`(`discord_message_id`);
+        "#;
+        let stmt = Statement::from_string(manager.get_database_backend(), sql.to_owned());
+        manager.get_connection().execute(stmt).await.map(|_| ())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.drop_table(Table::drop().table(GalleryPosts::Table).to_owned()).await?;
+        manager.drop_table(Table::drop().table(Alias::new("gallery")).to_owned()).await?;
 
-        manager.drop_table(Table::drop().table(Galleries::Table).to_owned()).await
+        manager.drop_table(Table::drop().table(Alias::new("gallery_post")).to_owned()).await
     }
 }
