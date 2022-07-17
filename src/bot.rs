@@ -13,22 +13,25 @@ pub struct Handler {
 #[async_trait]
 impl EventHandler for Handler{
     async fn message(&self, ctx: Context, msg: Message) {
+        // Copy the channel_id for later usage, since msg is moved to the handler methods
+        let channel_id = msg.channel_id;
+        
         if msg.content == "~ping" {
-            send_message(&ctx, &msg.channel_id, "Pong!").await;
+            send_message(&ctx, &channel_id, "Pong!").await;
         } else if msg.content == "~gallery" {
-            if let Err(why) = self.handle_gallery_command(&ctx, &msg).await {
+            if let Err(why) = self.handle_gallery_command(&ctx, msg).await {
                 error!("Error executing gallery command: {:?}", why);
-                send_message(&ctx, &msg.channel_id, "An error occured while running the command.").await;
+                send_message(&ctx, &channel_id, "An error occured while running the command.").await;
             }
         } else {
-            if let Err(why) = self.handle_new_message(&ctx, &msg).await {
+            if let Err(why) = self.handle_new_message(&ctx, msg).await {
                 error!("Error handling new message: {:?}", why);
             }
         }
     }
 
     async fn message_update(&self, ctx: Context, event: MessageUpdateEvent) {
-        if let Err(why) = self.handle_message_update(&ctx, &event).await {
+        if let Err(why) = self.handle_message_update(&ctx, event).await {
             error!("Error handling message update: {:?}", why);
         }
     }
@@ -39,7 +42,7 @@ impl EventHandler for Handler{
 }
 
 impl Handler {
-    async fn handle_gallery_command(&self, ctx: &Context, msg: &Message) -> Result<()> {
+    async fn handle_gallery_command(&self, ctx: &Context, msg: Message) -> Result<()> {
         let span = span!(Level::TRACE, "create_gallery");
         let _enter = span.enter();
 
@@ -60,7 +63,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn handle_new_message(&self, _ctx: &Context, msg: &Message) -> Result<()> {
+    async fn handle_new_message(&self, _ctx: &Context, msg: Message) -> Result<()> {
         let span = span!(Level::TRACE, "handle_new_message");
         let _enter = span.enter();
         debug!("handle_new message() - Message: {:?}", msg);
@@ -84,7 +87,7 @@ impl Handler {
         }
     }
 
-    async fn handle_message_update(&self, _ctx: &Context, event: &MessageUpdateEvent) -> Result<()> {
+    async fn handle_message_update(&self, _ctx: &Context, event: MessageUpdateEvent) -> Result<()> {
         let span = span!(Level::TRACE, "handle_message_update");
         let _enter = span.enter();
         debug!("handle_message_update() - MessageUpdateEvent: {:?}", event);
