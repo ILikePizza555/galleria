@@ -122,7 +122,7 @@ impl Handler {
                 
                 debug!("Removed {} rows.", del_result.rows_affected);
                 
-                if (new_posts.len() > 0 ) {
+                if new_posts.len() > 0 {
                     gallery_post::Entity::insert_many(new_posts).exec(txn).await?;
                 } else {
                     debug!("No new posts to insert.");
