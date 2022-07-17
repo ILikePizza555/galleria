@@ -11,13 +11,11 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        lib-fenix = fenix.packages.${system};
-        rust = lib-fenix.combine [
-          lib-fenix.stable.cargo
-          lib-fenix.stable.rustc
-          lib-fenix.stable.rustfmt
-          lib-fenix.stable.rust-src
-          lib-fenix.targets.wasm32-unknown-unknown.latest.rust-std
+        rust = fenix.packages.${system}.stable.withComponents [ 
+          "cargo"
+          "rustc"
+          "rustfmt"
+          "rust-src"
         ];
         commonBuildInputs = [
           pkgs.openssl

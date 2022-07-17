@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "sql-entities", "migration", "frontend"]
+members = [".", "sql-entities", "migration"]
 
 [package]
 name = "galleria"
