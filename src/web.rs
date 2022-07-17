@@ -33,11 +33,8 @@ async fn render_gallery_posts(gallery_id: Uuid, db: Arc<DatabaseConnection>) -> 
             error!("Could not load posts from db: {:?}", why);
             Err(warp::reject::custom(DbError(why)))
         }
-        Ok(posts) => if posts.len() == 0 {
-            warn!("Loaded zero posts from gallery id {}", gallery_id);
-            Err(warp::reject())
-        } else {
-            debug!("Loaded {} posts from galler {}", posts.len(), gallery_id);
+        Ok(posts) => {
+            debug!("Loaded {} posts from gallery {}", posts.len(), gallery_id);
             let markup = html! {
                 (maud::DOCTYPE)
                 html {
@@ -46,18 +43,25 @@ async fn render_gallery_posts(gallery_id: Uuid, db: Arc<DatabaseConnection>) -> 
                         link rel="stylesheet" href="/static/galleria.css";
                     }
                     body {
-                        #gallery role = "list" {
-                            @for post in posts {
-                                @if let Some(url) = post.media_url {
-                                img.gallery-item
-                                    rel="noreferrer"
-                                    role = "listitem"
-                                    src = (url)
-                                    width = (post.media_width.unwrap_or_default())
-                                    height = (post.media_height.unwrap_or_default())
-                                    loading="lazy";
-                                } @else {
-                                    #error { "There was an error loading this image." }
+                        header {
+                            h1 { "G-alpha-ria" }
+                        }
+                        @if posts.is_empty() {
+                            "Looks like this gallery has no entries"
+                        } @else {
+                            #gallery role = "list" {
+                                @for post in posts {
+                                    @if let Some(url) = post.media_url {
+                                    img.gallery-item
+                                        rel="noreferrer"
+                                        role = "listitem"
+                                        src = (url)
+                                        width = (post.media_width.unwrap_or_default())
+                                        height = (post.media_height.unwrap_or_default())
+                                        loading="lazy";
+                                    } @else {
+                                        #error { "There was an error loading this image." }
+                                    }
                                 }
                             }
                         }

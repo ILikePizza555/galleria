@@ -1,7 +1,26 @@
+body {
+    margin: 0;
+    background-color: #36393f;
+    color: #dcddde;
+    font-family: sans-serif;
+}
+
+header {
+    padding: 1em;
+    background-color: #36393f;
+    box-shadow: rgba(4, 4, 5, 0.2) 0px 1px 0px 0px, rgba(6, 6, 7, 0.05) 0px 1.5px 0px 0px, rgba(4, 4, 5, 0.05) 0px 2px 0px 0px;
+    position: sticky;
+    top: 0;
+}
+
+h1 {
+    margin: 0;
+}
+
 #gallery {
-    width: 100%;
+    margin: 1em;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(328px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
     gap: 1em;
     place-items: center;
 }
