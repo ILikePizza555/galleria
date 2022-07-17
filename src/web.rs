@@ -1,14 +1,14 @@
 use std::{sync::Arc, convert::Infallible};
 
 use maud::html;
-use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, prelude::Uuid};
 use serenity::http::StatusCode;
 use sql_entities::gallery_post;
 use warp::Filter;
 use tracing::{debug, warn, error};
 
 pub fn galleria_service(db: Arc<DatabaseConnection>) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::path!("gallery" / i32)
+    warp::path!("gallery" / Uuid)
         .and(warp::any().map(move || db.clone()))
         .and_then(render_gallery_posts)
         .or(
@@ -16,7 +16,7 @@ pub fn galleria_service(db: Arc<DatabaseConnection>) -> impl Filter<Extract = im
         )
 }
 
-async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> Result<impl warp::Reply, Infallible> {
+async fn render_gallery_posts(gallery_id: Uuid, db: Arc<DatabaseConnection>) -> Result<impl warp::Reply, Infallible> {
     let posts_result = gallery_post::Entity::find()
         .filter(gallery_post::Column::Gallery.eq(gallery_id))
         .all(db.as_ref())
