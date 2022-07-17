@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use anyhow::{Result, Context as ErrorContext};
+use anyhow::Result;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr, InsertResult, TransactionTrait};
-use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel, Attachment, Embed}, gateway::Ready, id::ChannelId, event::MessageUpdateEvent}};
+use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel, Attachment, Embed, EmbedThumbnail, EmbedImage}, gateway::Ready, id::ChannelId, event::MessageUpdateEvent}};
 use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::{gallery, gallery_post};
 
@@ -181,36 +181,47 @@ fn embeds_to_db<'r>(
     gallery: &'r gallery::Model,
     discord_message_id: u64
 ) -> impl Iterator<Item = gallery_post::ActiveModel> + 'r {
-    embeds.filter_map(move |e| match e.image {
-        Some(image) => {
-            let (thumbnail_url, thumbnail_width, thumbnail_height) = e.thumbnail
-                .map(|t| (
-                    Some(t.url),
-                    t.width.and_then(|w| i32::try_from(w).ok()),
-                    t.height.and_then(|h| i32::try_from(h).ok())
-                ))
-                .unwrap_or_default();
+    embeds.filter_map(move |e|
+        if e.image.is_none() && e.thumbnail.is_none() {
+            None
+        } else {
+            let (image_url, image_width, image_height) = transpose_embed_image(e.image);
+            let (thumbnail_url, thumbnail_width, thumbnail_height) = tranpose_embed_thumbnail(e.thumbnail);
             
             Some(gallery_post::ActiveModel {
                 gallery: ActiveValue::Set(gallery.pk),
                 discord_message_id: ActiveValue::Set(discord_message_id as i64),
                 source_url: ActiveValue::Set(e.url),
-                media_url: ActiveValue::Set(Some(image.url)),
-                media_width: ActiveValue::Set(image.width.and_then(|i| i32::try_from(i).ok())),
-                media_height: ActiveValue::Set(image.height.and_then(|i| i32::try_from(i).ok())),
+                media_url: ActiveValue::Set(image_url),
+                media_width: ActiveValue::Set(image_width),
+                media_height: ActiveValue::Set(image_height),
                 thumbnail_url: ActiveValue::Set(thumbnail_url),
                 thumbnail_width: ActiveValue::Set(thumbnail_width),
                 thumbnail_height: ActiveValue::Set(thumbnail_height),
                 ..Default::default()
             })
         }
-        None => {
-            debug!("Embed has no image.");
-            None
-        }
-    })
+    )
 }
 
 fn attachment_is_image(a: &Attachment) -> bool {
     a.content_type.as_ref().map(|s| s.starts_with("image")).unwrap_or(false)
+}
+
+fn tranpose_embed_thumbnail(thumbnail: Option<EmbedThumbnail>) -> (Option<String>, Option<i32>, Option<i32>) {
+    thumbnail.map(|t| (
+        Some(t.url),
+        t.width.and_then(|w| i32::try_from(w).ok()),
+        t.height.and_then(|h| i32::try_from(h).ok())
+    ))
+    .unwrap_or_default()
+}
+
+fn transpose_embed_image(image: Option<EmbedImage>) -> (Option<String>, Option<i32>, Option<i32>) {
+    image.map(|i| (
+        Some(i.url),
+        i.width.and_then(|w| i32::try_from(w).ok()),
+        i.height.and_then(|h| i32::try_from(h).ok())
+    ))
+    .unwrap_or_default()
 }
