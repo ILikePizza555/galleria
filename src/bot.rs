@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Result, Context as ErrorContext};
-use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr, InsertResult};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr, InsertResult, TransactionTrait};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel, Attachment, Embed}, gateway::Ready, id::ChannelId, event::MessageUpdateEvent}};
 use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::{gallery, gallery_post};
@@ -97,30 +97,38 @@ impl Handler {
         let _enter = span.enter();
         debug!("handle_message_update() - MessageUpdateEvent: {:?}", event);
 
-        let image_urls: Vec<String> = filter_image_urls(
-            event.attachments.as_ref().unwrap_or(&Vec::new()).iter(),
-            event.embeds.as_ref().unwrap_or(&Vec::new()).iter()
-        ).collect();
-
-        if image_urls.len() == 0 {
-            debug!("Message update has no new image attachments or embeds");
-            return Ok(())
-        }
-        
-        let gallery = self.find_gallery_from_channel_id(event.channel_id)
-            .await
-            .context("Failed to query database for galleries with channel id.")?;
-
-        match gallery {
-            Some(gallery_model) => {
-                self.create_gallery_posts(&gallery_model, event.id.0, image_urls).await?;
-                Ok(())
-            }
+        let gallery_model = match self.find_gallery_from_channel_id(event.channel_id).await? {
+            Some(gallery_model) => gallery_model,
             None => {
                 debug!("No gallery found with associated channel_id {}", event.channel_id.0);
-                Ok(())
+                return Ok(());
             }
-        }
+        };
+
+        // Handle the update by removing all rows associated with the message and re-adding them.
+        // Probably not very efficient, but I don't expect more than a few embeds per message.
+        let attachments = event.attachments.unwrap_or_default();
+        let embeds = event.embeds.unwrap_or_default();
+        let new_posts = attachments_to_db(attachments.into_iter(), &gallery_model, event.id.0)
+            .chain(embeds_to_db(embeds.into_iter(), &gallery_model, event.id.0))
+            .collect::<Vec<gallery_post::ActiveModel>>();
+
+        self.db_connection.transaction::<_, (), DbErr>(|txn| {
+            Box::pin(async move {
+                let del_result = gallery_post::Entity::delete_many()
+                    .filter(gallery_post::Column::DiscordMessageId.eq(event.id.0 as i64))
+                    .exec(txn)
+                    .await?;
+                
+                debug!("Removed {} rows.", del_result.rows_affected);
+                
+                let insert_result = gallery_post::Entity::insert_many(new_posts).exec(txn).await?;
+                
+                Ok(())
+            })
+        }).await?;
+
+        Ok(())
     }
 
     async fn find_gallery_from_channel_id(&self, channel_id: ChannelId) -> Result<Option<gallery::Model>, DbErr> {
