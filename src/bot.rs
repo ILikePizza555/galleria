@@ -4,7 +4,7 @@ use anyhow::{Result, Context as ErrorContext};
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait, ActiveValue, ActiveModelTrait, DbErr, InsertResult};
 use serenity::{async_trait, client::{EventHandler, Context}, model::{channel::{Message, Channel, Attachment, Embed}, gateway::Ready, id::ChannelId, event::MessageUpdateEvent}};
 use tracing::{info, debug, warn, error, span, Level};
-use sql_entities::{galleries, gallery_posts};
+use sql_entities::{gallery, gallery_post};
 
 pub struct Handler {
     pub db_connection: Arc<DatabaseConnection>
@@ -68,23 +68,28 @@ impl Handler {
         let _enter = span.enter();
         debug!("handle_new message() - Message: {:?}", msg);
 
-        let image_urls: Vec<String> = filter_image_urls_from_message(&msg).collect();
-        if image_urls.len() == 0 {
-            debug!("Message {} has no image attachements or embeds", msg.id.0);
+        // Optimization: Return if no attachements or embeds before querying the database
+        if msg.attachments.len() == 0 && msg.embeds.len() == 0 {
+            debug!("Message {} has no embeds or attachments.", msg.id.0);
             return Ok(())
         }
 
-        let gallery = self.find_gallery_from_channel_id(msg.channel_id).await?;
-        match gallery {
-            Some(gallery_model) => {
-                self.create_gallery_posts(&gallery_model, msg.id.0, image_urls).await?;
-                Ok(())
-            },
+        let gallery_model = match self.find_gallery_from_channel_id(msg.channel_id).await? {
+            Some(gallery_model) => gallery_model,
             None => {
                 debug!("No gallery found with associated channel_id {}", msg.channel_id.0);
-                Ok(())
+                return Ok(())
             }
-        }
+        };
+
+        // Grab all attachments and embeds into posts
+        let new_posts = attachments_to_db(msg.attachments.into_iter(), &gallery_model, msg.id.0)
+            .chain(embeds_to_db(msg.embeds.into_iter(), &gallery_model, msg.id.0))
+            .collect::<Vec<gallery_post::ActiveModel>>();
+
+        gallery_post::Entity::insert_many(new_posts).exec(self.db_connection.as_ref()).await?;
+
+        Ok(())
     }
 
     async fn handle_message_update(&self, _ctx: &Context, event: MessageUpdateEvent) -> Result<()> {
@@ -118,36 +123,21 @@ impl Handler {
         }
     }
 
-    async fn find_gallery_from_channel_id(&self, channel_id: ChannelId) -> Result<Option<galleries::Model>, DbErr> {
-        galleries::Entity::find()
-            .filter(galleries::Column::DiscordChannelId.eq(channel_id.0 as i64))
+    async fn find_gallery_from_channel_id(&self, channel_id: ChannelId) -> Result<Option<gallery::Model>, DbErr> {
+        gallery::Entity::find()
+            .filter(gallery::Column::DiscordChannelId.eq(channel_id.0 as i64))
             .one(self.db_connection.as_ref())
             .await
     }
 
-    async fn create_gallery(&self, channel: Channel) -> Result<galleries::Model, DbErr> {
-        let gallery_active_model = galleries::ActiveModel {
+    async fn create_gallery(&self, channel: Channel) -> Result<gallery::Model, DbErr> {
+        let gallery_active_model = gallery::ActiveModel {
             name: ActiveValue::Set(channel.to_string()),
             discord_channel_id: ActiveValue::Set(channel.id().0 as i64),
             ..Default::default()
         };
 
         gallery_active_model.insert(self.db_connection.as_ref()).await
-    }
-
-    async fn create_gallery_posts(&self, gallery: &galleries::Model, message_id: u64, image_urls: Vec<String>) -> Result<InsertResult<gallery_posts::ActiveModel>> {
-        let new_gallery_posts = image_urls.iter()
-            .map(|url| gallery_posts::ActiveModel {
-                gallery: ActiveValue::Set(gallery.pk),
-                discord_message_id: ActiveValue::Set(message_id as i64),
-                link: ActiveValue::Set(url.to_string()),
-                ..Default::default()
-            });
-        
-        gallery_posts::Entity::insert_many(new_gallery_posts)
-            .exec(self.db_connection.as_ref())
-            .await
-            .context("Gallery_post insert_many query failed.")
     }
 }
 
@@ -158,33 +148,57 @@ async fn send_message(ctx: &Context, channel_id: &ChannelId, message: impl std::
     }
 }
 
-fn filter_image_urls_from_message(message: &Message) -> impl Iterator<Item = String> + '_ {
-    filter_image_urls(message.attachments.iter(), message.embeds.iter())
+// Converts an iterator of Attachment objects to an iterator of gallery_post::ActiveModel objects. 
+fn attachments_to_db<'r>(
+    attachments: impl Iterator<Item = Attachment> + 'r,
+    gallery: &'r gallery::Model,
+    discord_message_id: u64
+) -> impl Iterator<Item = gallery_post::ActiveModel> + 'r {
+    attachments.filter(attachment_is_image).map(move |a| gallery_post::ActiveModel {
+        gallery: ActiveValue::Set(gallery.pk),
+        discord_message_id: ActiveValue::Set(discord_message_id as i64),
+        media_url: ActiveValue::Set(Some(a.url)),
+        media_width: ActiveValue::Set(a.width.and_then(|i| i32::try_from(i).ok())),
+        media_height: ActiveValue::Set(a.height.and_then(|i| i32::try_from(i).ok())),
+        ..Default::default()
+    })
 }
 
-/// Filters images from the embeds or attachements from a message
-fn filter_image_urls<'l, A, E>(a: A, e: E) -> impl Iterator<Item = String> + 'l
-where
-    A: Iterator<Item = &'l Attachment> + 'l,
-    E: Iterator<Item = &'l Embed> + 'l
-{
-    let attachments_iter = a
-        .filter_map(
-            |a| a.content_type.as_ref().and_then(
-                |content_type| if content_type.starts_with("image") {
-                    Some(a.url.clone())
-                } else {
-                    None
-                }
-            )
-        );
-    
-    let embeds_iter = e
-        .filter_map(|e| {
-            e.image.as_ref()
-                .map(|i| i.url.clone())
-                .or_else(|| e.thumbnail.as_ref().map(|t| t.url.clone()))
-        });
-    
-    attachments_iter.chain(embeds_iter)
+fn embeds_to_db<'r>(
+    embeds: impl Iterator<Item = Embed> + 'r,
+    gallery: &'r gallery::Model,
+    discord_message_id: u64
+) -> impl Iterator<Item = gallery_post::ActiveModel> + 'r {
+    embeds.filter_map(move |e| match e.image {
+        Some(image) => {
+            let (thumbnail_url, thumbnail_width, thumbnail_height) = e.thumbnail
+                .map(|t| (
+                    Some(t.url),
+                    t.width.and_then(|w| i32::try_from(w).ok()),
+                    t.height.and_then(|h| i32::try_from(h).ok())
+                ))
+                .unwrap_or_default();
+            
+            Some(gallery_post::ActiveModel {
+                gallery: ActiveValue::Set(gallery.pk),
+                discord_message_id: ActiveValue::Set(discord_message_id as i64),
+                source_url: ActiveValue::Set(e.url),
+                media_url: ActiveValue::Set(Some(image.url)),
+                media_width: ActiveValue::Set(image.width.and_then(|i| i32::try_from(i).ok())),
+                media_height: ActiveValue::Set(image.height.and_then(|i| i32::try_from(i).ok())),
+                thumbnail_url: ActiveValue::Set(thumbnail_url),
+                thumbnail_width: ActiveValue::Set(thumbnail_width),
+                thumbnail_height: ActiveValue::Set(thumbnail_height),
+                ..Default::default()
+            })
+        }
+        None => {
+            debug!("Embed has no image.");
+            None
+        }
+    })
+}
+
+fn attachment_is_image(a: &Attachment) -> bool {
+    a.content_type.as_ref().map(|s| s.starts_with("image")).unwrap_or(false)
 }
