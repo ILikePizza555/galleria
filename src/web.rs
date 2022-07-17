@@ -3,7 +3,7 @@ use std::{sync::Arc, convert::Infallible};
 use maud::html;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait};
 use serenity::http::StatusCode;
-use sql_entities::gallery_posts;
+use sql_entities::gallery_post;
 use warp::Filter;
 use tracing::{debug, warn, error};
 
@@ -17,8 +17,8 @@ pub fn galleria_service(db: Arc<DatabaseConnection>) -> impl Filter<Extract = im
 }
 
 async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> Result<impl warp::Reply, Infallible> {
-    let posts_result = gallery_posts::Entity::find()
-        .filter(gallery_posts::Column::Gallery.eq(gallery_id))
+    let posts_result = gallery_post::Entity::find()
+        .filter(gallery_post::Column::Gallery.eq(gallery_id))
         .all(db.as_ref())
         .await;
     
@@ -42,7 +42,17 @@ async fn render_gallery_posts(gallery_id: i32, db: Arc<DatabaseConnection>) -> R
                     body {
                         #gallery role = "list" {
                             @for post in posts {
-                                img.gallery-item rel="noreferrer" role = "listitem" src = (post.link) loading="lazy";
+                                @if let Some(url) = post.media_url {
+                                img.gallery-item
+                                    rel="noreferrer"
+                                    role = "listitem"
+                                    src = (url)
+                                    width = (post.media_width.unwrap_or_default())
+                                    height = (post.media_height.unwrap_or_default())
+                                    loading="lazy";
+                                } @else {
+                                    #error { "There was an error loading this image." }
+                                }
                             }
                         }
                     }
