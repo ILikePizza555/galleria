@@ -13,7 +13,7 @@ use sea_orm::Database;
 use serenity::Client;
 use serenity::prelude::GatewayIntents;
 
-fn load() -> Result<(String, String)> {
+fn load() -> Result<(String, String, String)> {
     // Load the dotenv file, but ignore not found errors. 
     dotenv::dotenv()
         .map(|ok| Some(ok))
@@ -29,13 +29,14 @@ fn load() -> Result<(String, String)> {
 
     let token = env::var("DISCORD_TOKEN")?;
     let db_url = env::var("DATABASE_URL")?;
+    let base_url = env::var("BASE_URL");
 
-    Ok((token, db_url ))
+    Ok((token, db_url, base_url))
 }
 
 #[tokio::main]
 async fn main() {
-    let (token, db_url) = load().unwrap();
+    let (token, db_url, base_url) = load().unwrap();
 
     tracing_subscriber::fmt::init();
 
@@ -49,7 +50,7 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     let mut discord_client = Client::builder(&token, intents)
-        .event_handler(Handler { db_connection: db_connection.clone() })
+        .event_handler(Handler { db_connection: db_connection.clone(), base_url })
         .await
         .expect("Error created client");
     

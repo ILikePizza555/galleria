@@ -7,6 +7,7 @@ use tracing::{info, debug, warn, error, span, Level};
 use sql_entities::{gallery, gallery_post};
 
 pub struct Handler {
+    pub base_url: String,
     pub db_connection: Arc<DatabaseConnection>
 }
 
@@ -57,6 +58,8 @@ impl Handler {
 
         let new_gallery = self.create_gallery(msg.channel(&ctx.http).await?).await?;
         info!("Successfully created a new gallery: {}.", new_gallery.pk);
+
+        send_message(&ctx, &&msg.channel_id, format!("New gallery created at {}/gallery/{}", &self.base_url, &new_gallery.pk)).await;
 
         // TODO: Grab all previous messages 
         
