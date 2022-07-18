@@ -17,7 +17,7 @@ h1 {
     margin: 0;
 }
 
-#gallery {
+.gallery {
     margin: 1em;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
@@ -29,4 +29,14 @@ h1 {
     display: block;
     max-width: 100%;
     height: auto;
+    transition: box-shadow cubic-bezier(.79,.14,.15,.86) 0.75s;
+}
+
+.gallery-item:hover {
+    box-shadow: 0px 0px 7px 0px #7289DA;
+}
+
+.gallery-item img {
+    height: 100%;
+    width: 100%;
 }
