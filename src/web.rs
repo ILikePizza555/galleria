@@ -56,32 +56,11 @@ fn render_gallery_posts(posts: Vec<JsonValue>) -> impl warp::Reply {
                     h1 { "G-alpha-ria" }
                 }
                 main #app-container { }
-                script { (maud::PreEscaped(format!("var page_data = {}; console.log(page_data);", serde_json::to_string(&posts).unwrap_or("Error".to_string())))) }
-                script type="module" src="/static/index.mjs";
+                script { (maud::PreEscaped(format!("window.page_data = {}; console.log(page_data);", serde_json::to_string(&posts).unwrap_or("Error".to_string())))) }
+                script type="module" src="/static/index.mjs" {}
                 
             }
         }
     };
     Ok(warp::reply::with_status(warp::reply::html(markup.into_string()), StatusCode::OK))
 }
-
-/*
-@if posts.is_empty() {
-                    "Looks like this gallery has no entries"
-                } @else {
-                    #gallery role = "list" {
-                        @for post in posts {
-                            @if let Some(url) = post.media_url {
-                            img.gallery-item
-                                rel="noreferrer"
-                                role = "listitem"
-                                src = (url)
-                                width = (post.media_width.unwrap_or_default())
-                                height = (post.media_height.unwrap_or_default())
-                                loading="lazy";
-                            } @else {
-                                #error { "There was an error loading this image." }
-                            }
-                        }
-                    }
-                } */
