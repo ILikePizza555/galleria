@@ -69,7 +69,6 @@ impl Handler {
     async fn handle_new_message(&self, _ctx: &Context, msg: Message) -> Result<()> {
         let span = span!(Level::TRACE, "handle_new_message");
         let _enter = span.enter();
-        debug!("handle_new message() - Message: {:?}", msg);
 
         // Optimization: Return if no attachements or embeds before querying the database
         if msg.attachments.len() == 0 && msg.embeds.len() == 0 {
