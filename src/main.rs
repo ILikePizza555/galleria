@@ -5,6 +5,8 @@ use crate::bot::Handler;
 use crate::web::galleria_service;
 
 use std::env;
+use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::Result;
 use futures::FutureExt;
@@ -13,7 +15,14 @@ use sea_orm::Database;
 use serenity::Client;
 use serenity::prelude::GatewayIntents;
 
-fn load() -> Result<(String, String, String)> {
+struct Environment {
+    token: String,
+    db_url: String,
+    base_url: String,
+    web_listen_addr: SocketAddr
+}
+
+fn load() -> Result<Environment> {
     // Load the dotenv file, but ignore not found errors. 
     dotenv::dotenv()
         .map(|ok| Some(ok))
@@ -27,21 +36,22 @@ fn load() -> Result<(String, String, String)> {
             _ => Err(err)
         })?;
 
-    let token = env::var("DISCORD_TOKEN")?;
-    let db_url = env::var("DATABASE_URL")?;
-    let base_url = env::var("BASE_URL");
-
-    Ok((token, db_url, base_url))
+    Ok(Environment {
+        token: env::var("DISCORD_TOKEN")?,
+        db_url:  env::var("DATABASE_URL")?,
+        base_url: env::var("BASE_URL")?,
+        web_listen_addr: SocketAddr::from_str(&env::var("LISTEN_ADDR")?)?
+    })
 }
 
 #[tokio::main]
 async fn main() {
-    let (token, db_url, base_url) = load().unwrap();
+    let environment = load().unwrap();
 
     tracing_subscriber::fmt::init();
 
     // Setup DB
-    let db_connection_base = Database::connect(db_url).await
+    let db_connection_base = Database::connect(environment.db_url).await
         .expect("Could not estable a connection to the database.");
     let db_connection = Arc::new(db_connection_base);
 
@@ -49,12 +59,12 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut discord_client = Client::builder(&token, intents)
-        .event_handler(Handler { db_connection: db_connection.clone(), base_url })
+    let mut discord_client = Client::builder(&environment.token, intents)
+        .event_handler(Handler { db_connection: db_connection.clone(), base_url: environment.base_url })
         .await
         .expect("Error created client");
     
-    let web_server = warp::serve(galleria_service(db_connection.clone())).bind(([127, 0, 0, 1], 3030))
+    let web_server = warp::serve(galleria_service(db_connection.clone())).bind(environment.web_listen_addr)
         .map(|_| Ok(()));
 
     if let Err(why) = try_join(discord_client.start(), web_server).await {
